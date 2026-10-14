@@ -4,56 +4,48 @@
     <meta charset="UTF-8">
     <title>Mon Importateur MP3 Alexa</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; text-align: center; padding-top: 50px; position: relative; margin: 0; min-height: 90vh; }
-        
-        /* Style du système de version en haut à droite */
-        .version-tag {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            background-color: #252525;
-            color: #00bbff;
-            padding: 5px 12px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: bold;
-            border: 1px solid #333;
-            letter-spacing: 0.5px;
-        }
-
-        .container { background: #1e1e1e; padding: 30px; display: inline-block; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 380px; margin-top: 40px; }
-        h1 { color: #00bbff; font-size: 24px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; text-align: center; padding-top: 30px; position: relative; margin: 0; min-height: 95vh; }
+        .version-tag { position: absolute; top: 15px; right: 20px; background-color: #252525; color: #00bbff; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; border: 1px solid #333; }
+        .container { background: #1e1e1e; padding: 30px; display: inline-block; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px; margin-top: 40px; text-align: left; }
+        h1 { color: #00bbff; font-size: 24px; text-align: center; margin-top: 0; }
+        .section-title { font-weight: bold; color: #00bbff; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         input[type="file"] { display: none; }
-        .upload-label { background: #252525; border: 2px dashed #00bbff; padding: 25px; display: block; margin: 20px 0; cursor: pointer; border-radius: 10px; transition: 0.3s; }
+        .upload-label { background: #252525; border: 2px dashed #00bbff; padding: 20px; display: block; margin: 15px 0; cursor: pointer; border-radius: 10px; text-align: center; transition: 0.3s; }
         .upload-label:hover { background: #2a2a2a; }
-        button { background: #00bbff; color: #fff; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; width: 100%; border-radius: 25px; font-size: 16px; transition: 0.3s; }
+        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #252525; color: #fff; box-sizing: border-box; }
+        button { background: #00bbff; color: #fff; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; width: 100%; border-radius: 25px; font-size: 16px; margin-top: 5px; transition: 0.3s; }
         button:hover { background: #0088cc; }
-        .progress-container { width: 100%; background-color: #333; border-radius: 10px; margin: 20px 0; display: none; }
-        .progress-bar { width: 0%; height: 10px; background-color: #00bbff; border-radius: 10px; transition: width 0.1s; }
-        #status { margin-top: 15px; color: #bbb; font-weight: bold; word-break: break-all; line-height: 1.5; }
+        .progress-container { width: 100%; background-color: #333; border-radius: 10px; margin: 15px 0; display: none; }
+        .progress-bar { width: 0%; height: 10px; background-color: #00bbff; border-radius: 10px; }
+        #status { margin-top: 15px; color: #bbb; font-weight: bold; word-break: break-all; text-align: center; line-height: 1.4; }
     </style>
 </head>
 <body>
 
-<!-- Badge de version visible -->
-<div class="version-tag">Version 1.1.0</div>
+<div class="version-tag">Version 1.2.0</div>
 
 <div class="container">
-    <h1>🎵 Importer pour Alexa</h1>
-    <p>Sélectionne un fichier MP3 sur ton appareil pour l'activer sur ta Skill.</p>
+    <h1>🎵 Nirrox Media Center</h1>
     
+    <!-- METHODE A : POUR LES FICHIERS DEJA SUR GITHUB -->
+    <div class="section-title">Méthode A : Fichier déjà sur ton GitHub</div>
+    <p style="font-size: 13px; margin: 0; color: #aaa;">Si tu as glissé ton MP3 à la racine de ton dépôt <b>mes-musique</b>, écris simplement son nom exact ci-dessous :</p>
+    <input type="text" id="github-filename" placeholder="exemple: ma-chanson.mp3">
+    <button id="github-btn">Lier le fichier GitHub à Alexa</button>
+
+    <!-- METHODE B : L'IMPORTATEUR DIRECT -->
+    <div class="section-title" style="margin-top: 30px;">Méthode B : Importer depuis ton appareil</div>
     <label class="upload-label" for="file-input">
         <span id="file-text">📁 Cliquez pour choisir un MP3</span>
         <input type="file" id="file-input" accept="audio/mp3">
     </label>
-
-    <button id="submit-btn">Lancer l'importation</button>
+    <button id="submit-btn">Lancer l'importation web</button>
     
     <div class="progress-container" id="progress-area">
         <div class="progress-bar" id="progress-bar"></div>
     </div>
     
-    <div id="status">En attente d'un fichier...</div>
+    <div id="status">En attente d'une action...</div>
 </div>
 
 <script type="module">
@@ -72,17 +64,49 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Infos GitHub pour formater l'adresse automatiquement
+    const GITHUB_USER = "giulianolackner5-png";
+    const GITHUB_REPO = "mes-musique";
+
     const fileInput = document.getElementById('file-input');
     const fileText = document.getElementById('file-text');
     const submitBtn = document.getElementById('submit-btn');
+    const githubBtn = document.getElementById('github-btn');
+    const githubFilename = document.getElementById('github-filename');
     const statusDiv = document.getElementById('status');
     const progressArea = document.getElementById('progress-area');
     const progressBar = document.getElementById('progress-bar');
 
+    // --- ACTION METHODE A (GITHUB EN DIRECT) ---
+    githubBtn.addEventListener('click', async () => {
+        const name = githubFilename.value.trim();
+        if(!name) {
+            statusDiv.innerText = "❌ Écris le nom de ton fichier (ex: musique.mp3) !";
+            return;
+        }
+        
+        statusDiv.innerText = "⏳ Liaison avec Firebase...";
+        // Formate automatiquement l'adresse web vers ton GitHub Pages
+        const githubUrl = `https://${GITHUB_USER}.github.io/${GITHUB_REPO}/${name}`;
+
+        try {
+            await setDoc(doc(db, "musiques", "current_song"), {
+                url: githubUrl,
+                song_name: name,
+                timestamp: new Date()
+            });
+            statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ LIEN GITHUB ACTIVÉ !</span><br><br>Alexa va lire le fichier stocké sur ton dépôt !";
+            githubFilename.value = "";
+        } catch(err) {
+            statusDiv.innerText = "❌ Erreur de liaison Firebase.";
+        }
+    });
+
+    // --- ACTION METHODE B (IMPORTATEUR CLASSIQUE) ---
     fileInput.addEventListener('change', (e) => {
         if(e.target.files.length > 0) {
             fileText.innerText = "🎵 " + e.target.files[0].name;
-            statusDiv.innerHTML = "Fichier sélectionné avec succès !<br>Clique sur le bouton pour l'envoyer.";
+            statusDiv.innerHTML = "Fichier sélectionné !<br>Clique sur le bouton bleu pour l'envoyer.";
         }
     });
 
@@ -124,9 +148,9 @@
                             timestamp: new Date()
                         });
 
-                        statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ IMPORTATION RÉUSSIE !</span><br><br><b>Nom :</b> " + singleFile.name + "<br><br>Tu peux maintenant dire : 'Alexa, ouvre nirrox' !";
+                        statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ IMPORTATION RÉUSSIE !</span><br><br><b>Nom :</b> " + singleFile.name + "<br><br>Dis maintenant : 'Alexa, ouvre nirrox' !";
                     } else {
-                        statusDiv.innerText = "❌ Le serveur d'hébergement a refusé le fichier.";
+                        statusDiv.innerText = "❌ Le serveur a refusé le fichier.";
                     }
                 } catch (err) {
                     statusDiv.innerText = "❌ Erreur lors du traitement de la réponse.";
@@ -134,10 +158,6 @@
             } else {
                 statusDiv.innerText = "❌ Erreur de transfert (Code: " + xhr.status + ").";
             }
-        });
-
-        xhr.addEventListener('error', () => {
-            statusDiv.innerText = "❌ Erreur réseau lors de l'importation.";
         });
 
         xhr.open('POST', 'https://file.io', true);
