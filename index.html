@@ -2,123 +2,106 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Lecteur Alexa - Importateur de Musique</title>
+    <title>Mon Importateur MP3 Alexa</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background-color: #1e1e1e;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            text-align: center;
-            width: 400px;
-        }
-        h1 { color: #00bbff; font-size: 24px; margin-bottom: 20px; }
-        .upload-box {
-            border: 2px dashed #00bbff;
-            padding: 30px;
-            border-radius: 10px;
-            cursor: pointer;
-            margin-bottom: 20px;
-            display: block;
-            transition: 0.3s;
-        }
-        .upload-box:hover { background-color: #252525; }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            border: 1px solid #444;
-            background: #252525;
-            color: #fff;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #00bbff;
-            color: #fff;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 25px;
-            font-size: 16px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 100%;
-            transition: 0.3s;
-        }
-        button:hover { background-color: #0088cc; }
-        #status { margin-top: 15px; font-weight: bold; color: #bbbbbb; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; text-align: center; padding-top: 50px; }
+        .container { background: #1e1e1e; padding: 30px; display: inline-block; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 380px; }
+        h1 { color: #00bbff; font-size: 24px; }
+        input[type="file"] { display: none; }
+        .upload-label { background: #252525; border: 2px dashed #00bbff; padding: 25px; display: block; margin: 20px 0; cursor: pointer; border-radius: 10px; transition: 0.3s; }
+        .upload-label:hover { background: #2a2a2a; }
+        button { background: #00bbff; color: #fff; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; width: 100%; border-radius: 25px; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #0088cc; }
+        #status { margin-top: 15px; color: #bbb; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🎵 Importateur Alexa</h1>
-    <p>Colle le lien direct de ton MP3 (ex: ton lien GitHub Pages) pour l'ajouter à ta Skill Alexa :</p>
+    <h1>🎵 Importer pour Alexa</h1>
+    <p>Sélectionne un fichier MP3 sur ton appareil pour l'envoyer sur le site et l'activer sur ta Skill.</p>
     
-    <input type="text" id="music-url-input" placeholder="https://.../ma-musique.mp3">
+    <label class="upload-label" for="file-input">
+        <span id="file-text">📁 Cliquez pour choisir un MP3</span>
+        <input type="file" id="file-input" accept="audio/mp3">
+    </label>
 
-    <button id="upload-btn">Ajouter à Alexa</button>
-    <div id="status">En attente d'un lien...</div>
+    <button id="submit-btn">Lancer l'importation</button>
+    <div id="status">En attente d'un fichier...</div>
 </div>
 
-<!-- Scripts Firebase (Modules CDN) -->
 <script type="module">
     import { initializeApp } from "https://gstatic.com";
     import { getFirestore, doc, setDoc } from "https://gstatic.com";
 
-    // Configuration Firebase avec tes clés
+    // Configuration de ton Firebase pour parler à Alexa
     const firebaseConfig = {
       apiKey: "AIzaSyAUgs-X0v-j1TdicX45schRwVfz--piPgg",
       authDomain: "://firebaseapp.com",
       projectId: "mon-lecteur-alexa",
       storageBucket: "mon-lecteur-alexa.firebasestorage.app",
       messagingSenderId: "765878158887",
-      appId: "1:765878158887:web:94c3048157a70f05193002",
-      measurementId: "G-7P80LY6HC3"
+      appId: "1:765878158887:web:94c3048157a70f05193002"
     };
 
-    // Initialisation de Firebase et de Firestore (Base de données)
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const urlInput = document.getElementById('music-url-input');
-    const uploadBtn = document.getElementById('upload-btn');
+    const fileInput = document.getElementById('file-input');
+    const fileText = document.getElementById('file-text');
+    const submitBtn = document.getElementById('submit-btn');
     const statusDiv = document.getElementById('status');
 
-    uploadBtn.addEventListener('click', async () => {
-        const urlFile = urlInput.value.trim();
-        if (!urlFile) {
-            statusDiv.innerText = "❌ Veuillez entrer une URL de fichier !";
+    // Affiche le nom du fichier dès qu'on le choisit
+    fileInput.addEventListener('change', (e) => {
+        if(e.target.files.length > 0) {
+            fileText.innerText = "🎵 " + e.target.files[0].name;
+            statusDiv.innerText = "Fichier prêt à être envoyé.";
+        }
+    });
+
+    // Action quand on clique sur le bouton
+    submitBtn.addEventListener('click', async () => {
+        if (fileInput.files.length === 0) {
+            statusDiv.innerText = "❌ Choisis d'abord un fichier MP3 !";
             return;
         }
 
-        statusDiv.innerText = "⏳ Enregistrement dans la base...";
-        
+        const file = fileInput.files[0];
+        statusDiv.innerText = "⏳ Envoi du MP3 en cours (ça peut prendre quelques secondes)...";
+
+        // On utilise un serveur d'envoi de fichier gratuit et anonyme (File.io)
+        const formData = new FormData();
+        formData.append('file', file);
+
         try {
-            // Enregistre l'URL dans un document unique nommé "current_song" dans Firestore
-            await setDoc(doc(db, "musiques", "current_song"), {
-                url: urlFile,
-                timestamp: new Date()
+            // 1. Le site envoie le fichier sur le serveur internet
+            const response = await fetch('https://file.io', { 
+                method: 'POST',
+                body: formData
             });
-            statusDiv.innerText = "✅ Lié à Alexa avec succès !";
-            urlInput.value = "";
-        } catch (error) {
-            console.error(error);
-            statusDiv.innerText = "❌ Erreur lors de l'enregistrement dans la base.";
+            
+            const data = await response.json();
+
+            if (data.success) {
+                statusDiv.innerText = "⏳ MP3 hébergé ! Liaison avec Alexa...";
+                const musicUrl = data.link; // C'est l'URL HTTPS générée automatiquement
+
+                // 2. Le site envoie cette URL directement dans ton Firebase Firestore pour Alexa
+                await setDoc(doc(db, "musiques", "current_song"), {
+                    url: musicUrl,
+                    timestamp: new Date()
+                });
+
+                statusDiv.innerText = "✅ Réussi ! Ta musique est disponible sur Alexa !";
+            } else {
+                statusDiv.innerText = "❌ Erreur du serveur d'hébergement. Réessaye.";
+            }
+        } catch (err) {
+            console.error(err);
+            statusDiv.innerText = "❌ Erreur d'importation réseau.";
         }
     });
 </script>
-
 </body>
 </html>
