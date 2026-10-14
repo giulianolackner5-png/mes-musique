@@ -12,11 +12,8 @@
         .upload-label:hover { background: #2a2a2a; }
         button { background: #00bbff; color: #fff; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; width: 100%; border-radius: 25px; font-size: 16px; transition: 0.3s; }
         button:hover { background: #0088cc; }
-        
-        /* Style de la barre de chargement */
         .progress-container { width: 100%; background-color: #333; border-radius: 10px; margin: 20px 0; display: none; }
         .progress-bar { width: 0%; height: 10px; background-color: #00bbff; border-radius: 10px; transition: width 0.1s; }
-        
         #status { margin-top: 15px; color: #bbb; font-weight: bold; word-break: break-all; line-height: 1.5; }
     </style>
 </head>
@@ -33,7 +30,6 @@
 
     <button id="submit-btn">Lancer l'importation</button>
     
-    <!-- Barre de progression visible pendant l'envoi -->
     <div class="progress-container" id="progress-area">
         <div class="progress-bar" id="progress-bar"></div>
     </div>
@@ -45,6 +41,7 @@
     import { initializeApp } from "https://gstatic.com";
     import { getFirestore, doc, setDoc } from "https://gstatic.com";
 
+    // Configuration Firebase corrigée !
     const firebaseConfig = {
       apiKey: "AIzaSyAUgs-X0v-j1TdicX45schRwVfz--piPgg",
       authDomain: "://firebaseapp.com",
@@ -85,10 +82,8 @@
         const formData = new FormData();
         formData.append('file', singleFile);
 
-        // Création de la requête réseau avec suivi de progression
         const xhr = new XMLHttpRequest();
         
-        // Cette fonction s'exécute à chaque fois que le fichier progresse sur internet
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const percentComplete = Math.round((e.loaded / e.total) * 100);
@@ -97,31 +92,29 @@
             }
         });
 
-        // Cette fonction s'exécute quand le serveur distant a bien reçu tout le fichier
         xhr.addEventListener('load', async () => {
             if (xhr.status === 200) {
                 try {
                     const data = JSON.parse(xhr.responseText);
                     if (data.success || data.link) {
                         const musicUrl = data.link;
-                        statusDiv.innerHTML = "⚙️ Fichier reçu par le serveur !<br>Liaison en cours avec ta base Firebase Alexa...";
+                        statusDiv.innerHTML = "⚙️ Fichier reçu !<br>Liaison en cours avec Firebase...";
 
-                        // Enregistrement des détails dans Cloud Firestore
                         await setDoc(doc(db, "musiques", "current_song"), {
                             url: musicUrl,
                             song_name: singleFile.name,
                             timestamp: new Date()
                         });
 
-                        statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ IMPORTATION RÉUSSIE !</span><br><br><b>Nom :</b> " + singleFile.name + "<br><b>Lien généré :</b> " + musicUrl + "<br><br>Tu peux maintenant le demander à Alexa !";
+                        statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ IMPORTATION RÉUSSIE !</span><br><br><b>Nom :</b> " + singleFile.name + "<br><br>Tu peux maintenant dire : 'Alexa, ouvre nirrox' !";
                     } else {
                         statusDiv.innerText = "❌ Le serveur d'hébergement a refusé le fichier.";
                     }
                 } catch (err) {
-                    statusDiv.innerText = "❌ Erreur lors du traitement de la réponse du serveur.";
+                    statusDiv.innerText = "❌ Erreur lors du traitement de la réponse.";
                 }
             } else {
-                statusDiv.innerText = "❌ Erreur de transfert avec le serveur (Code: " + xhr.status + ").";
+                statusDiv.innerText = "❌ Erreur de transfert (Code: " + xhr.status + ").";
             }
         });
 
@@ -129,7 +122,6 @@
             statusDiv.innerText = "❌ Erreur réseau lors de l'importation.";
         });
 
-        // Envoi réel vers le serveur d'hébergement temporaire
         xhr.open('POST', 'https://file.io', true);
         xhr.send(formData);
     });
