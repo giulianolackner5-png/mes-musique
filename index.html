@@ -30,10 +30,20 @@
             border-radius: 10px;
             cursor: pointer;
             margin-bottom: 20px;
+            display: block;
             transition: 0.3s;
         }
         .upload-box:hover { background-color: #252525; }
-        input[type="file"] { display: none; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #252525;
+            color: #fff;
+            box-sizing: border-box;
+        }
         button {
             background-color: #00bbff;
             color: #fff;
@@ -48,45 +58,29 @@
         }
         button:hover { background-color: #0088cc; }
         #status { margin-top: 15px; font-weight: bold; color: #bbbbbb; }
-        #link-container {
-            margin-top: 20px;
-            background-color: #292929;
-            padding: 10px;
-            border-radius: 5px;
-            word-break: break-all;
-            display: none;
-        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎵 Importateur Alexa</h1>
-    <p>Sélectionnez votre musique au format MP3 pour l'envoyer sur le cloud.</p>
+    <p>Colle le lien direct de ton MP3 (ex: ton lien GitHub Pages) pour l'ajouter à ta Skill Alexa :</p>
     
-    <label class="upload-box" for="music-file">
-        <span id="box-text">Cliquez pour choisir un MP3</span>
-        <input type="file" id="music-file" accept="audio/mp3">
-    </label>
+    <input type="text" id="music-url-input" placeholder="https://.../ma-musique.mp3">
 
-    <button id="upload-btn">Uploader la musique</button>
-    <div id="status">En attente d'un fichier...</div>
-    
-    <div id="link-container">
-        <p style="font-size: 12px; margin: 0; color: #00bbff;">Lien direct généré pour votre Skill Alexa :</p>
-        <span id="music-url" style="font-size: 14px; font-weight: bold;"></span>
-    </div>
+    <button id="upload-btn">Ajouter à Alexa</button>
+    <div id="status">En attente d'un lien...</div>
 </div>
 
 <!-- Scripts Firebase (Modules CDN) -->
 <script type="module">
     import { initializeApp } from "https://gstatic.com";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://gstatic.com";
+    import { getFirestore, doc, setDoc } from "https://gstatic.com";
 
-    // Configuration Firebase avec VOS clés privées injectées
+    // Configuration Firebase avec tes clés
     const firebaseConfig = {
       apiKey: "AIzaSyAUgs-X0v-j1TdicX45schRwVfz--piPgg",
-      authDomain: "mon-lecteur-alexa.firebaseapp.com",
+      authDomain: "://firebaseapp.com",
       projectId: "mon-lecteur-alexa",
       storageBucket: "mon-lecteur-alexa.firebasestorage.app",
       messagingSenderId: "765878158887",
@@ -94,51 +88,35 @@
       measurementId: "G-7P80LY6HC3"
     };
 
-    // Initialisation
+    // Initialisation de Firebase et de Firestore (Base de données)
     const app = initializeApp(firebaseConfig);
-    const storage = getStorage(app);
+    const db = getFirestore(app);
 
-    const fileInput = document.getElementById('music-file');
-    const boxText = document.getElementById('box-text');
+    const urlInput = document.getElementById('music-url-input');
     const uploadBtn = document.getElementById('upload-btn');
     const statusDiv = document.getElementById('status');
-    const linkContainer = document.getElementById('link-container');
-    const musicUrlSpan = document.getElementById('music-url');
 
-    // Détecte le choix de la musique
-    fileInput.addEventListener('change', (e) => {
-        if(e.target.files.length > 0) {
-            boxText.innerText = "Fichier sélectionné : " + e.target.files[0].name;
-            statusDiv.innerText = "Prêt pour l'envoi.";
-        }
-    });
-
-    // Logique d'upload au clic sur le bouton
-    uploadBtn.addEventListener('click', () => {
-        const file = fileInput.files[0];
-        if (!file) {
-            statusDiv.innerText = "❌ Veuillez d'abord choisir un fichier !";
+    uploadBtn.addEventListener('click', async () => {
+        const urlFile = urlInput.value.trim();
+        if (!urlFile) {
+            statusDiv.innerText = "❌ Veuillez entrer une URL de fichier !";
             return;
         }
 
-        statusDiv.innerText = "⏳ Envoi en cours... Veuillez patienter.";
+        statusDiv.innerText = "⏳ Enregistrement dans la base...";
         
-        // Crée un dossier "musiques" dans Firebase avec le nom de votre fichier
-        const storageRef = ref(storage, 'musiques/' + file.name);
-
-        uploadBytes(storageRef, file).then((snapshot) => {
-            statusDiv.innerText = "✅ Musique enregistrée avec succès !";
-            
-            // Récupère le lien HTTPS sécurisé utilisable par Alexa
-            return getDownloadURL(storageRef);
-        }).then((url) => {
-            linkContainer.style.display = "block";
-            musicUrlSpan.innerText = url;
-            console.log("URL utilisable par Alexa : ", url);
-        }).catch((error) => {
+        try {
+            // Enregistre l'URL dans un document unique nommé "current_song" dans Firestore
+            await setDoc(doc(db, "musiques", "current_song"), {
+                url: urlFile,
+                timestamp: new Date()
+            });
+            statusDiv.innerText = "✅ Lié à Alexa avec succès !";
+            urlInput.value = "";
+        } catch (error) {
             console.error(error);
-            statusDiv.innerText = "❌ Erreur de stockage. Vérifiez vos règles Firebase Storage.";
-        });
+            statusDiv.innerText = "❌ Erreur lors de l'enregistrement dans la base.";
+        }
     });
 </script>
 
