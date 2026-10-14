@@ -12,14 +12,19 @@
         .upload-label:hover { background: #2a2a2a; }
         button { background: #00bbff; color: #fff; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; width: 100%; border-radius: 25px; font-size: 16px; transition: 0.3s; }
         button:hover { background: #0088cc; }
-        #status { margin-top: 15px; color: #bbb; font-weight: bold; }
+        
+        /* Style de la barre de chargement */
+        .progress-container { width: 100%; background-color: #333; border-radius: 10px; margin: 20px 0; display: none; }
+        .progress-bar { width: 0%; height: 10px; background-color: #00bbff; border-radius: 10px; transition: width 0.1s; }
+        
+        #status { margin-top: 15px; color: #bbb; font-weight: bold; word-break: break-all; line-height: 1.5; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎵 Importer pour Alexa</h1>
-    <p>Sélectionne un fichier MP3 sur ton appareil pour l'envoyer sur le site et l'activer sur ta Skill.</p>
+    <p>Sélectionne un fichier MP3 sur ton appareil pour l'activer sur ta Skill.</p>
     
     <label class="upload-label" for="file-input">
         <span id="file-text">📁 Cliquez pour choisir un MP3</span>
@@ -27,6 +32,12 @@
     </label>
 
     <button id="submit-btn">Lancer l'importation</button>
+    
+    <!-- Barre de progression visible pendant l'envoi -->
+    <div class="progress-container" id="progress-area">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    
     <div id="status">En attente d'un fichier...</div>
 </div>
 
@@ -34,7 +45,6 @@
     import { initializeApp } from "https://gstatic.com";
     import { getFirestore, doc, setDoc } from "https://gstatic.com";
 
-    // Configuration de ton Firebase pour parler à Alexa
     const firebaseConfig = {
       apiKey: "AIzaSyAUgs-X0v-j1TdicX45schRwVfz--piPgg",
       authDomain: "://firebaseapp.com",
@@ -51,56 +61,77 @@
     const fileText = document.getElementById('file-text');
     const submitBtn = document.getElementById('submit-btn');
     const statusDiv = document.getElementById('status');
+    const progressArea = document.getElementById('progress-area');
+    const progressBar = document.getElementById('progress-bar');
 
-    // Affiche le nom du fichier dès qu'on le choisit
     fileInput.addEventListener('change', (e) => {
         if(e.target.files.length > 0) {
             fileText.innerText = "🎵 " + e.target.files[0].name;
-            statusDiv.innerText = "Fichier prêt à être envoyé.";
+            statusDiv.innerHTML = "Fichier sélectionné avec succès !<br>Clique sur le bouton pour l'envoyer.";
         }
     });
 
-    // Action quand on clique sur le bouton
-    submitBtn.addEventListener('click', async () => {
+    submitBtn.addEventListener('click', () => {
         if (fileInput.files.length === 0) {
             statusDiv.innerText = "❌ Choisis d'abord un fichier MP3 !";
             return;
         }
 
-        const file = fileInput.files[0];
-        statusDiv.innerText = "⏳ Envoi du MP3 en cours (ça peut prendre quelques secondes)...";
+        const singleFile = fileInput.files[0];
+        statusDiv.innerText = "⏳ Préparation du fichier...";
+        progressArea.style.display = "block";
+        progressBar.style.width = "0%";
 
-        // On utilise un serveur d'envoi de fichier gratuit et anonyme (File.io)
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', singleFile);
 
-        try {
-            // 1. Le site envoie le fichier sur le serveur internet
-            const response = await fetch('https://file.io', { 
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-
-            if (data.success) {
-                statusDiv.innerText = "⏳ MP3 hébergé ! Liaison avec Alexa...";
-                const musicUrl = data.link; // C'est l'URL HTTPS générée automatiquement
-
-                // 2. Le site envoie cette URL directement dans ton Firebase Firestore pour Alexa
-                await setDoc(doc(db, "musiques", "current_song"), {
-                    url: musicUrl,
-                    timestamp: new Date()
-                });
-
-                statusDiv.innerText = "✅ Réussi ! Ta musique est disponible sur Alexa !";
-            } else {
-                statusDiv.innerText = "❌ Erreur du serveur d'hébergement. Réessaye.";
+        // Création de la requête réseau avec suivi de progression
+        const xhr = new XMLHttpRequest();
+        
+        // Cette fonction s'exécute à chaque fois que le fichier progresse sur internet
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percentComplete + '%';
+                statusDiv.innerHTML = "⏳ Envoi du MP3 en cours... <b>" + percentComplete + "%</b>";
             }
-        } catch (err) {
-            console.error(err);
-            statusDiv.innerText = "❌ Erreur d'importation réseau.";
-        }
+        });
+
+        // Cette fonction s'exécute quand le serveur distant a bien reçu tout le fichier
+        xhr.addEventListener('load', async () => {
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success || data.link) {
+                        const musicUrl = data.link;
+                        statusDiv.innerHTML = "⚙️ Fichier reçu par le serveur !<br>Liaison en cours avec ta base Firebase Alexa...";
+
+                        // Enregistrement des détails dans Cloud Firestore
+                        await setDoc(doc(db, "musiques", "current_song"), {
+                            url: musicUrl,
+                            song_name: singleFile.name,
+                            timestamp: new Date()
+                        });
+
+                        statusDiv.innerHTML = "<span style='color: #00ff88;'>✅ IMPORTATION RÉUSSIE !</span><br><br><b>Nom :</b> " + singleFile.name + "<br><b>Lien généré :</b> " + musicUrl + "<br><br>Tu peux maintenant le demander à Alexa !";
+                    } else {
+                        statusDiv.innerText = "❌ Le serveur d'hébergement a refusé le fichier.";
+                    }
+                } catch (err) {
+                    statusDiv.innerText = "❌ Erreur lors du traitement de la réponse du serveur.";
+                }
+            } else {
+                statusDiv.innerText = "❌ Erreur de transfert avec le serveur (Code: " + xhr.status + ").";
+            }
+        });
+
+        xhr.addEventListener('error', () => {
+            statusDiv.innerText = "❌ Erreur réseau lors de l'importation.";
+        });
+
+        // Envoi réel vers le serveur d'hébergement temporaire
+        xhr.open('POST', 'https://file.io', true);
+        xhr.send(formData);
     });
 </script>
 </body>
