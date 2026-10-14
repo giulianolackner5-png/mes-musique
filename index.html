@@ -41,7 +41,6 @@
     import { initializeApp } from "https://gstatic.com";
     import { getFirestore, doc, setDoc } from "https://gstatic.com";
 
-    // Configuration Firebase corrigée !
     const firebaseConfig = {
       apiKey: "AIzaSyAUgs-X0v-j1TdicX45schRwVfz--piPgg",
       authDomain: "://firebaseapp.com",
@@ -74,6 +73,7 @@
             return;
         }
 
+        // CORRECTIF APPLIQUÉ ICI : On cible le fichier [0]
         const singleFile = fileInput.files[0];
         statusDiv.innerText = "⏳ Préparation du fichier...";
         progressArea.style.display = "block";
